@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+  
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+}
+
+model Event {
+  id               String      @id @default(cuid())
+  title            String
+  description      String?
+  venue            String
+  startsAt         DateTime
+  totalTickets     Int
+  availableTickets Int
+  priceInPaise     Int
+  status           EventStatus @default(DRAFT)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
