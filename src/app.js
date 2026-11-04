@@ -4,6 +4,9 @@ import helmet from "helmet";
 import { prisma } from "./lib/prisma.js";
 import authRoutes from "./routes/auth.routes.js"
 import { authenticateToken } from "./middleware/auth.middleware.js";
+import { authorizeRoles } from "./middleware/authorize.middleware.js";
+import bookingRoutes from "./routes/booking.routes.js";
+
 
 const app = express();
 
@@ -11,6 +14,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use("/api/v1/auth",authRoutes);
+app.use("/api/v1/bookings",bookingRoutes);
 
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
@@ -41,7 +45,8 @@ app.get("/api/v1/db-check",async(req,res)=>{
 
 
 // Create event
-app.post("/api/v1/events",authenticateToken, async (req, res) => {
+app.post("/api/v1/events",authenticateToken,  authorizeRoles("ORGANIZER", "ADMIN"),
+ async (req, res) => {
   try {
     const {
       title,
@@ -309,7 +314,7 @@ app.get("/api/v1/events",async(req,res)=>{
 
 
 //Publish an event atomically
-app.patch("/api/v1/events/:id/publish",async(req,res)=>{
+app.patch("/api/v1/events/:id/publish",authenticateToken,authorizeRoles("ORGANIZER", "ADMIN"),async(req,res)=>{
   try {
     const{id}=req.params;
 
@@ -365,7 +370,7 @@ app.patch("/api/v1/events/:id/publish",async(req,res)=>{
 
 
 //cancel a published event atomically
-app.patch("/api/v1/events/:id/cancel",async(req,res)=>{
+app.patch("/api/v1/events/:id/cancel", authenticateToken,authorizeRoles("ORGANIZER", "ADMIN"),async(req,res)=>{
   try {
     
     const {id}=req.params;

@@ -19,6 +19,13 @@ enum UserRole{
   ADMIN
 }
 
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
 model Event {
   id               String      @id @default(cuid())
   title            String
@@ -31,6 +38,10 @@ model Event {
   status           EventStatus @default(DRAFT)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+
+
+  bookings Booking[]
+  tickets  Ticket[]
 }
 
 model User {
@@ -41,5 +52,51 @@ model User {
   role              UserRole      @default(USER)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+
+  bookings          Booking[]
+  tickets           Ticket[]
+
+
 }
 
+model Booking {
+  id                String        @id @default(cuid())
+  userId            String
+  eventId           String
+  quantity          Int
+  status            BookingStatus @default(PENDING)
+  expiresAt         DateTime
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+
+  user        User    @relation(fields:[userId],references:[id],onDelete:Restrict)
+  event       Event   @relation(fields:[eventId],references:[id],onDelete:Restrict)
+  tickets     Ticket[]
+
+
+  @@index([userId])
+  @@index([eventId,status])
+  @@index([status,expiresAt])
+}
+
+model Ticket {
+  id              String        @id @default(cuid())
+  bookingId       String
+  eventId         String
+  userId          String
+  qrcode          String         @unique
+  checkedIn       Boolean        @default(false)
+  checkedInAt     DateTime?
+  createdAt       DateTime       @default(now())
+
+
+  booking         Booking       @relation(fields:[bookingId],references:[id],onDelete:Restrict)
+  event           Event         @relation(fields:[eventId],references:[id],onDelete:Restrict)
+  user            User          @relation(fields:[userId],references:[id],onDelete:Restrict)
+
+  @@index([bookingId])
+  @@index([eventId,checkedIn])
+  @@index([userId])
+
+}
