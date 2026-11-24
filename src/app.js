@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.routes.js"
 import { authenticateToken } from "./middleware/auth.middleware.js";
 import { authorizeRoles } from "./middleware/authorize.middleware.js";
 import bookingRoutes from "./routes/booking.routes.js";
+import ticketRoutes from "./routes/ticket.routes.js";
 
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/v1/auth",authRoutes);
 app.use("/api/v1/bookings",bookingRoutes);
+app.use("/api/v1/tickets",ticketRoutes);
 
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
@@ -115,6 +117,7 @@ app.post("/api/v1/events",authenticateToken,  authorizeRoles("ORGANIZER", "ADMIN
         totalTickets,
         availableTickets: totalTickets,
         priceInPaise,
+        organizerId: req.user.id,
       },
     });
 
@@ -318,11 +321,17 @@ app.patch("/api/v1/events/:id/publish",authenticateToken,authorizeRoles("ORGANIZ
   try {
     const{id}=req.params;
 
+    const where={
+      id,
+      status:"DRAFT",
+      ...(req.user.role ==="ADMIN"
+        ?{}
+        :{organizerId:req.user.id}
+      )
+    };
+
     const result =await prisma.event.updateMany({
-      where:{
-        id,
-        status:"DRAFT",
-      },
+      where,
       data:{
         status:"PUBLISHED",
       }
@@ -331,13 +340,27 @@ app.patch("/api/v1/events/:id/publish",authenticateToken,authorizeRoles("ORGANIZ
     if (result.count===0){
       const event=await prisma.event.findUnique({
         where:{id},
-        select:{id:true}
+        select:{id:true,
+          status:true,
+          organizerId:true,
+        },
       });
 
       if(!event){
         return res.status(404).json({
           success:false,
           message:"Event not found",
+        });
+      }
+
+
+      if(
+        req.user.role!=="ADMIN" &&
+        event.organizerId!==req.user.id
+      ){
+        return res.status(403).json({
+          success:false,
+          message:"You cannot publish an event you do not own"
         });
       }
 
@@ -375,11 +398,17 @@ app.patch("/api/v1/events/:id/cancel", authenticateToken,authorizeRoles("ORGANIZ
     
     const {id}=req.params;
 
+    const where={
+      id,
+      status:"PUBLISHED",
+      ...(req.user.role==="ADMIN"
+        ?{}
+        :{organizerId:req.user.id}
+      ),
+    };
+
     const result=await prisma.event.updateMany({
-      where:{
-        id,
-        status:"PUBLISHED",
-      },
+      where,
       data:{
         status:"CANCELLED",
       },
@@ -388,7 +417,7 @@ app.patch("/api/v1/events/:id/cancel", authenticateToken,authorizeRoles("ORGANIZ
     if(result.count===0){
       const event=await prisma.event.findUnique({
         where:{id},
-        select:{id:true,status:true},
+        select:{id:true,status:true,organizerId:true},
       });
 
       if(!event){
@@ -398,6 +427,17 @@ app.patch("/api/v1/events/:id/cancel", authenticateToken,authorizeRoles("ORGANIZ
         });
       }
 
+
+        if(
+          req.user.role!=="ADMIN" &&
+          event.organizerId !==req.user.id
+        ){
+          return res.status(403).json({
+            success:false,
+            message:"You cannot cancel an event you do not own"
+          });
+        }
+        
       return res.status(409).json({
         success:false,
         message:"Only published events can be cancelled"
